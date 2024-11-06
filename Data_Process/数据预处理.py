@@ -76,98 +76,113 @@ def merge_tabular_data(data_dir):
 
 
 # 2. 表格数据的预处理和特征工程
-def analyze_missing_values(df):
-    """分析数据集中的缺失值情况"""
-    print("\n=== 缺失值分析 ===")
+def preprocess_tabular_data(df):
+    """处理合并数据集中的表格数据"""
+    print("\n开始处理表格数据...")
+    processed_df = df.copy()
     
-    # 计算每列的缺失比例
-    missing_ratio = (df.isnull().sum() / len(df) * 100).round(2)
-    missing_info = pd.DataFrame({
-        '缺失比例': missing_ratio,
-        '非空值数': df.count(),
-        '数据类型': df.dtypes
-    }).sort_values('缺失比例', ascending=False)
+    # 定义各数据源的特征列
+    baseline_cols = ['f.31.0.0', 'f.34.0.0', 'f.21022.0.0', 'f.21001.0.0', 
+                    'f.4079.0.0', 'f.4080.0.0']
     
-    print("\n高缺失率特征（缺失率>30%）:")
-    print(missing_info[missing_info['缺失比例'] > 30])
+    # 直接指定lifestyle特征列
+    lifestyle_cols = [
+        'f.2907.0.0', 'f.1478.0.0', 'f.1349.0.0', 'f.1100.0.0', 'f.2277.0.0',
+        'f.2926.0.0', 'f.1628.0.0', 'f.1269.0.0', 'f.1558.0.0', 'f.1210.0.0',
+        'f.1329.0.0', 'f.3466.0.0', 'f.1160.0.0', 'f.100024.0.0', 'f.2139.0.0',
+        'f.1050.0.0', 'f.971.0.0', 'f.1110.0.0', 'f.2887.0.0', 'f.100025.0.0',
+        'f.20160.0.0', 'f.1359.0.0', 'f.100009.0.0', 'f.924.0.0', 'f.1279.0.0',
+        'f.1598.0.0', 'f.1548.0.0', 'f.943.0.0', 'f.1170.0.0', 'f.2110.0.0',
+        'f.1200.0.0', 'f.1408.0.0', 'f.2644.0.0', 'f.1458.0.0', 'f.1369.0.0',
+        'f.2867.0.0', 'f.3731.0.0', 'f.1120.0.0', 'f.100017.0.0', 'f.20077.0.0',
+        'f.1060.0.0', 'f.874.0.0', 'f.1309.0.0', 'f.2237.0.0', 'f.1190.0.0',
+        'f.1249.0.0', 'f.914.0.0', 'f.100015.0.0', 'f.1299.0.0', 'f.1578.0.0',
+        'f.1130.0.0', 'f.100011.0.0', 'f.1239.0.0', 'f.981.0.0', 'f.1070.0.0',
+        'f.100760.0.0', 'f.3456.0.0', 'f.100005.0.0', 'f.1220.0.0', 'f.1319.0.0',
+        'f.3436.0.0', 'f.104400.0.0', 'f.2634.0.0', 'f.1289.0.0', 'f.1259.0.0',
+        'f.1568.0.0', 'f.1618.0.0', 'f.2149.0.0'
+    ]
     
-    return missing_info
-
-def handle_missing_values(df):
-    """处理缺失值"""
-    print("\n=== 开始处理缺失值 ===")
-    df_processed = df.copy()
+    nmr_cols = [f'f.{i}.0.0' for i in range(23400, 23649)]
     
-    # 定义重要特征
-    important_features = {
-        # 基础健康指标
-        'f.4079.0.0': '舒张压',
-        'f.4080.0.0': '收缩压',
-        'f.21001.0.0': '体重',
-        'f.50.0.0': '身高',
-        'f.30750.0.0': '心率',
-        
-        # 关键生活方式因素
-        'f.1558.0.0': '酒精饮用频率',
-        'f.1568.0.0': '饮酒量',
-        'f.2644.0.0': '吸烟状态',
-        'f.943.0.0': '步行活动频率',
-        
-        # 重要营养指标
-        'f.100024.0.0': '钙',
-        'f.100025.0.0': '维生素E',
-        'f.100015.0.0': '维生素C',
-        'f.100011.0.0': '铁'
-    }
+    print(f"开始处理前的特征数量:")
+    print(f"- Baseline特征: {len(baseline_cols)}")
+    print(f"- Lifestyle特征: {len(lifestyle_cols)}")
+    print(f"- NMR特征: {len(nmr_cols)}")
     
-    # 获取缺失值信息
-    missing_info = analyze_missing_values(df_processed)
+    # 1. 处理Baseline特征
+    print("\n处理Baseline特征...")
+    for col in baseline_cols:
+        if col in processed_df.columns:
+            # 处理缺失值：用中位数填充
+            if processed_df[col].isnull().any():
+                median_val = processed_df[col].median()
+                processed_df[col].fillna(median_val, inplace=True)
+                print(f"- {col}: 用中位数 {median_val:.2f} 填充缺失值")
+            
+            # 处理异常值：IQR方法
+            Q1 = processed_df[col].quantile(0.25)
+            Q3 = processed_df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            processed_df[col] = processed_df[col].clip(lower_bound, upper_bound)
     
-    # 处理高缺失率非重要特征
-    high_missing_cols = missing_info[
-        (missing_info['缺失比例'] > 65) & 
-        (~missing_info.index.isin(important_features.keys()))
-    ].index
+    # 2. 处理Lifestyle特征
+    print("\n处理Lifestyle特征...")
+    for col in lifestyle_cols:
+        if col in processed_df.columns:
+            # 将负值转换为绝对值
+            processed_df[col] = processed_df[col].abs()
+            
+            # 计算缺失率
+            missing_rate = processed_df[col].isnull().mean()
+            print(f"特征 {col} 的缺失率: {missing_rate:.2%}")
+            
+            if missing_rate > 0.6:
+                print(f"- 删除特征 {col}: 缺失率 {missing_rate:.2%}")
+                processed_df.drop(columns=[col], inplace=True)
+                continue
+            
+            # 对于缺失率<=60%的列，用该列的中位数填充缺失值
+            if processed_df[col].isnull().any():
+                median_val = processed_df[col].median()
+                processed_df[col].fillna(median_val, inplace=True)
+                print(f"- {col}: 用中位数 {median_val:.2f} 填充缺失值")
+            
+            # 处理异常值：IQR方法
+            Q1 = processed_df[col].quantile(0.25)
+            Q3 = processed_df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            processed_df[col] = processed_df[col].clip(lower_bound, upper_bound)
     
-    print(f"\n删除以下高缺失率非重要特征（{len(high_missing_cols)}个）:")
-    for col in high_missing_cols:
-        print(f"- {col}: {missing_info.loc[col, '缺失比例']}% 缺失")
-    df_processed = df_processed.drop(columns=high_missing_cols)
+    # 3. 处理NMR特征
+    print("\n处理NMR特征...")
+    for col in nmr_cols:
+        if col in processed_df.columns:
+            if processed_df[col].isnull().any():
+                # 获取25%到75%位置的值
+                Q1 = processed_df[col].quantile(0.25)
+                Q3 = processed_df[col].quantile(0.75)
+                # 随机选择这个范围内的值来填充
+                fill_values = np.random.uniform(Q1, Q3, size=processed_df[col].isnull().sum())
+                processed_df.loc[processed_df[col].isnull(), col] = fill_values
+                print(f"- {col}: 用[{Q1:.2f}, {Q3:.2f}]范围内的随机值填充缺失值")
+            
+            # 处理异常值：IQR方法
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            processed_df[col] = processed_df[col].clip(lower_bound, upper_bound)
     
-    # 处理重要特征的缺失值
-    for col in important_features:
-        if col in df_processed.columns:
-            missing_ratio = missing_info.loc[col, '缺失比例']
-            if missing_ratio > 0:
-                print(f"\n处理重要特征 {col} ({important_features[col]}):")
-                print(f"- 缺失比例: {missing_ratio}%")
-                
-                # 使用中位数填充数值型特征
-                if df_processed[col].dtype in ['int64', 'float64']:
-                    median_value = df_processed[col].median()
-                    df_processed[col].fillna(median_value, inplace=True)
-                    print(f"- 使用中位数 {median_value} 填充")
-                # 使用众数填充分类特征
-                else:
-                    mode_value = df_processed[col].mode()[0]
-                    df_processed[col].fillna(mode_value, inplace=True)
-                    print(f"- 使用众数 {mode_value} 填充")
+    # 检查处理结果
+    print("\n处理后的数据统计:")
+    print(f"- 总样本数量: {len(processed_df)}")
+    print(f"- 总特征数量: {len(processed_df.columns)}")
     
-    # 处理其他特征的缺失值
-    remaining_cols = [col for col in df_processed.columns 
-                     if col not in important_features and col != 'f.eid']
-    for col in remaining_cols:
-        if df_processed[col].isnull().sum() > 0:
-            if df_processed[col].dtype in ['int64', 'float64']:
-                df_processed[col].fillna(0, inplace=True)
-            else:
-                df_processed[col].fillna('unknown', inplace=True)
-    
-    print("\n缺失值处理完成！")
-    print(f"处理前数据形状: {df.shape}")
-    print(f"处理后数据形状: {df_processed.shape}")
-    
-    return df_processed
+    return processed_df
 
 
 # 3. 处理XML格式的心电数据
@@ -316,7 +331,7 @@ def check_output_files(directory):
 
 def align_and_merge_data(tabular_file, ecg_file, output_file):
     """合并预处理后的表格数据和ECG数据，只保留有ECG数据的患者"""
-    print("开始数据对齐与合并...")
+    print("始数据对齐与合并...")
     
     # 读取数据
     tabular_data = pd.read_csv(tabular_file)
@@ -436,6 +451,25 @@ def main():
     print("\n数据处理完成！")
     print(f"最终训练数据保存在: {os.path.join(final_train_dir, 'train_merged.csv')}")
     print(f"最终测试数据保存在: {os.path.join(final_test_dir, 'test_merged.csv')}")
+
+    # 在最后添加表格数据的预处理步骤
+    print("\n开始对合并后的数据进行表格数据预处理...")
+    
+    # 处理训练集
+    train_merged_path = os.path.join(final_train_dir, 'train_merged.csv')
+    train_merged = pd.read_csv(train_merged_path)
+    train_processed = preprocess_tabular_data(train_merged)
+    train_processed.to_csv(os.path.join(final_train_dir, 'train_merged.csv'), index=False)
+    
+    # 处理测试集
+    test_merged_path = os.path.join(final_test_dir, 'test_merged.csv')
+    test_merged = pd.read_csv(test_merged_path)
+    test_processed = preprocess_tabular_data(test_merged)
+    test_processed.to_csv(os.path.join(final_test_dir, 'test_merged.csv'), index=False)
+    
+    print("\n全部数据处理完成！")
+    print(f"最终处理后的训练数据保存在: {os.path.join(final_train_dir, 'train_merged.csv')}")
+    print(f"最终处理后的测试数据保存在: {os.path.join(final_test_dir, 'test_merged.csv')}")
 
 if __name__ == '__main__':
     start_time = time.time()

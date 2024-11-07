@@ -81,7 +81,48 @@ def preprocess_tabular_data(df):
     print("\n开始处理表格数据...")
     processed_df = df.copy()
     
+    if 'date' in processed_df.columns:
+        print("\n处理发病时间特征...")
+        # 将date转换为datetime格式
+        processed_df['date'] = pd.to_datetime(processed_df['date'], errors='coerce')
+        
+        # 只对有T2D的患者（T2D=1）处理发病时间
+        mask_t2d = processed_df['T2D'] == 1
+        
+        if mask_t2d.any():
+            # 选择一个固定的参考日期
+            reference_date = pd.Timestamp('2000-01-01')
+            print(f"参考日期: {reference_date}")
+            
+            # 计算距离参考日期的天数，默认为-1
+            processed_df['onset_days'] = -1
+            
+            # 只处理有效日期的记录
+            valid_dates = processed_df['date'].notna() & mask_t2d
+            if valid_dates.any():
+                processed_df.loc[valid_dates, 'onset_days'] = (
+                    processed_df.loc[valid_dates, 'date'] - reference_date).dt.days
+            
+            print(f"发病时间特征处理完成:")
+            print(f"- T2D患者总数: {mask_t2d.sum()}")
+            print(f"- 有发病日期的患者数: {(processed_df['onset_days'] >= 0).sum()}")
+            if valid_dates.any():
+                print(f"- 最早发病日期: {processed_df.loc[valid_dates, 'date'].min()}")
+                print(f"- 最晚发病日期: {processed_df.loc[valid_dates, 'date'].max()}")
+                print(f"- 发病天数范围: [{processed_df.loc[valid_dates, 'onset_days'].min():.0f}, "
+                      f"{processed_df.loc[valid_dates, 'onset_days'].max():.0f}]")
+            
+            # 重新排列列，确保onset_days紧跟在date后面
+            cols = list(processed_df.columns)
+            date_idx = cols.index('date')
+            cols.remove('onset_days')
+            cols.insert(date_idx + 1, 'onset_days')
+            processed_df = processed_df[cols]
+    
+    # 原有的特征处理代码继续保持不变
+
     # 定义各数据源的特征列
+    # 直接指定baseline特征列
     baseline_cols = ['f.31.0.0', 'f.34.0.0', 'f.21022.0.0', 'f.21001.0.0', 
                     'f.4079.0.0', 'f.4080.0.0']
     
@@ -426,7 +467,7 @@ def main():
     test_tabular_data.to_csv(os.path.join(test_dir, 'test_preprocessed_tabular.csv'), index=False)
     test_ecg_data.to_csv(os.path.join(test_dir, 'test_preprocessed_ecg.csv'), index=False)
 
-    # 创建最终输出目录
+    # 创最终输出目录
     final_train_dir = os.path.join(script_dir, "..", "data", "train")
     final_test_dir = os.path.join(script_dir, "..", "data", "test")
     os.makedirs(final_train_dir, exist_ok=True)

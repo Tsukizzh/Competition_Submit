@@ -1,0 +1,109 @@
+# ====================== 基础配置 ======================
+# 目标变量名称：你要预测的那一列的列名
+# 例如：如果你要预测房价，这里就写 'price'；如果要预测用户是否流失，这里就写 'is_churn'
+target_name: T2D
+
+# ====================== 特征配置 ======================
+# 分类特征：只包含有限个不同值的特征
+# 例如：性别（男/女）、城市（北京/上海/广州）、学历（高中/本科/硕士）等
+categorical_features:
+  - land_surface_condition  # 地表条件（例如：平地/斜坡/陡坡）
+  - foundation_type        # 地基类型（例如：水泥/砖石/木材）
+  - roof_type             # 屋顶类型
+  - ground_floor_type     # 地面楼层类型
+  # 可以继续添加更多分类特征...
+
+# 连续特征：可以取任意数值的特征
+# 例如：年龄、收入、面积、温度等数值型特征
+continuous_features: 
+  - age                   # 年龄（数值）
+  - area_percentage       # 面积百分比（0-100的数值）
+  - height_percentage     # 高度百分比
+  - has_superstructure_adobe_mud    # 是否有土坯结构（0或1）
+  # 可以继续添加更多连续特征...
+
+# 索引列：用于标识每条数据的唯一ID
+# 如果你的数据集有ID列（如用户ID、订单ID等），就在这里指定
+index_col: building_id
+
+# 目标变量映射：将原始的目标值映射为新的数值
+# 例如：将 '低风险'->0, '中风险'->1, '高风险'->2
+target_mapping: 
+  1: 0    # 原始值1映射为0
+  2: 1    # 原始值2映射为1
+  3: 2    # 原始值3映射为2
+
+# ====================== 数据配置 ======================
+# 随机种子：确保实验可以重复
+seed: 0
+
+# 数据文件配置
+data_dir: data            # 数据文件夹路径
+train_file: train.csv     # 训练数据文件名
+test_file: test.csv       # 测试数据文件名
+
+# 训练集分割配置：将训练数据分成训练集和验证集
+train_test_split: 
+  test_size: 0.05        # 使用5%的数据作为验证集
+  shuffle: true          # 是否打乱数据顺序（建议true）
+  # 可以添加 stratify: true 来确保分割后类别比例一致
+
+# ====================== 模型配置 ======================
+# 模型类型：这里使用的是特征标记化的Transformer模型
+model_class: feature_tokenizer_transformer
+model_kwargs:
+  # 模型结构参数
+  output_dim: 3          # 输出维度：分类任务就是类别数量
+  embedding_dim: 64      # 特征嵌入维度：决定了特征表示的丰富程度
+  nhead: 8              # 注意力头数：多头注意力机制中的头数
+  num_layers: 3         # Transformer编码器层数：层数越多，模型越复杂
+  dim_feedforward: 128  # 前馈网络维度：决定了模型的学习能力
+  
+  # MLP（多层感知机）配置
+  mlp_hidden_dims:      # MLP各隐藏层的维度
+    - 32               # 第一个隐藏层32个神经元
+    - 16               # 第二个隐藏层16个神经元
+  
+  # 激活函数和正则化
+  activation: 'gelu'    # 激活函数类型：gelu通常比relu表现更好
+  attn_dropout_rate: 0.01  # 注意力层的dropout率：防止过拟合
+  ffn_dropout_rate: 0.01   # 前馈网络的dropout率：防止过拟合
+
+# ====================== 训练配置 ======================
+# 损失函数配置
+loss_function: cross_entropy  # 分类任务常用交叉熵损失
+loss_kwargs: null            # 损失函数的额外参数
+
+# 优化器配置
+optim: adamw                 # 优化器类型：adamw是当前最常用的优化器
+optim_kwargs:
+  lr: 1.0e-3                # 学习率：决定参数更新的步长
+  weight_decay: 0.1         # 权重衰减：用于防止过拟合
+
+# 学习率调度器配置：动态调整学习率
+lr_scheduler: reduce_on_plateau  # 当性能不再提升时降低学习率
+lr_scheduler_kwargs: 
+  mode: min                 # 监控指标的模式：是越小越好还是越大越好
+  factor: 0.1              # 学习率调整因子：每次调整将学习率乘以0.1
+  patience: 10             # 容忍多少个epoch性能不提升
+lr_scheduler_by_custom_metric: true  # 是否使用自定义指标来调整学习率
+
+# 训练超参数
+train_batch_size: 128       # 训练时的批次大小
+eval_batch_size: 128        # 评估时的批次大小
+epochs: 100                 # 总训练轮数
+
+# ====================== 训练控制 ======================
+# 早停设置：防止过拟合
+early_stopping: true        # 是否启用早停
+early_stopping_patience: 5  # 当性能多少轮不提升就停止训练
+early_stopping_start_from: 20  # 从第几轮开始启用早停
+
+# 评估指标配置
+custom_metric: f1_score_macro  # 使用宏平均F1分数评估模型
+is_greater_better: false    # 该指标是否是越大越好
+
+# ====================== 输出配置 ======================
+# 预测结果输出配置
+to_submssion: true         # 是否生成预测结果文件
+submission_file: submission.csv  # 预测结果文件名

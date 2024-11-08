@@ -241,6 +241,7 @@ def train(model: torch.nn.Module, epochs: int, output_dim: int,
     model.load_state_dict(best_model_params)
 
     if save_model_path is not None:
+        os.makedirs(os.path.dirname(save_model_path), exist_ok=True)
         torch.save(model.state_dict(), save_model_path)
         logging.info('Model saved')
     

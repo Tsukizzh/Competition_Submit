@@ -2,6 +2,8 @@
 # 导入必要的库
 ################################
 import argparse  # argparse用于处理命令行参数，让我们可以在运行程序时传入配置文件
+import os  # os用于处理文件路径
+import numpy as np  # numpy用于处理数值计算
 
 # 从我们自己开发的tabtransformers包中导入核心功能
 # 这些功能都定义在项目的tabtransformers目录下
@@ -123,8 +125,8 @@ def main(args):
     # train_test_split:
     #   test_size: 0.2  # 使用20%的数据作为验证集
     #   stratify: true  # 分层采样，保持标签分布一致
-    val_params = config['train_test_split']
-    val_params['random_state'] = config['seed']  # 使用相同的随机种子确保可重复性
+    val_params = config['train_test_split'].copy()
+    val_params['stratify'] = None
 
     # 加载并划分数据集
     # get_data函数会：
@@ -132,10 +134,12 @@ def main(args):
     # 2. 将训练集划分出一部分作为验证集
     # 3. 返回三个pandas DataFrame：训练集、测试集、验证集
     train_data, test_data, val_data = \
-        get_data('data',  # 数据目录
-                split_val=True,  # 需要划分验证集
-                val_params=val_params,  # 验证集划分参数
-                index_col=config['index_col'])  # 索引列名，例如'id'
+        get_data(
+            'data',  # 数据目录
+            data_files=config['data_files'],
+            val_params=val_params,
+            index_col=config.get('index_col')
+        )
     
     ################################
     # 第3步：标签编码（针对分类问题）
@@ -208,7 +212,7 @@ def main(args):
         num_continuous_features=len(config['continuous_features'])  # 连续特征数量
     )
     
-    # 创建优化器实例
+    # 创建��化器实例
     # 优化器负责更新模型参数
     # 常用的优化器有：
     # - Adam：适应性较好，通常是默认选择
@@ -219,7 +223,7 @@ def main(args):
     )
     
     # 创建学习率调度器
-    # 用于动态调整学习率，帮助模型更好地收敛
+    # 用于动态调整学习率，帮助模更好地收敛
     scheduler = get_lr_scheduler_object(config)(
         optimizer,  # 优化器
         **config['lr_scheduler_kwargs']  # 调度器参数
@@ -271,9 +275,11 @@ def main(args):
         # 早停耐心值：
         # 例如设置为10，表示如果连续10个epoch性能没有提升，就停止训练
         
-        early_stopping_start_from=config['early_stopping_start_from']
+        early_stopping_start_from=config['early_stopping_start_from'],
         # 从第几轮开始启用早停
         # 例如设置为20，表示前20轮不启用早停
+        # 添加模型保存路径
+        save_model_path=os.path.join(config['model_dir'], f"{config['model_name']}_best.pth")
     )
     
     ################################
@@ -291,17 +297,22 @@ def main(args):
     # 第9步：模型预测
     ################################
     
+    # 在进行标签映射之前，先将预测值转换到 [0,1] 范围内
+    def sigmoid(x):
+        return 1 / (1 + np.exp(-x))
+
     # 使用训练好的模型在测试集上进行预测
     predictions = inference(
         model,  # 训练好的模型
         test_loader,  # 测试数据加载器
         config['model_kwargs']['output_dim']  # 输出维度
     )
-    
-    # 如果之前进行了标签映射，需要将数值预测结果转换回原始标签
-    # 例如：将[0, 1, 0]转换回['cat', 'dog', 'cat']
-    if reverse_target_mapping is not None:
-        predictions = [reverse_target_mapping[p] for p in predictions]
+    # 将预测值转换到概率值
+    predictions = sigmoid(predictions)
+    # 将概率值转换为类别（0或1）
+    predictions = (predictions > 0.5).astype(int)
+    # 然后再进行标签映射
+    predictions = [reverse_target_mapping[p] for p in predictions]
     
     ################################
     # 第10步：保存预测结果
@@ -317,6 +328,15 @@ def main(args):
             target_name=config['target_name'],  # 目标变量列名
             submission_path=config['submission_file']  # 保存路径
         )
+
+    # 在训练前添加
+    print("\n=== 数据集信息 ===")
+    print("训练集大小:", len(train_data))
+    print("训练集标签分布:")
+    print(train_data[config['target_name']].value_counts(normalize=True))
+    print("\n验证集大小:", len(val_data))
+    print("验证集标签分布:")
+    print(val_data[config['target_name']].value_counts(normalize=True))
 
 ################################
 # 程序入口

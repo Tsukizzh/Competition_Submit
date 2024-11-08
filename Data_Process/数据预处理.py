@@ -263,7 +263,7 @@ def process_ecg_data(ecg_dir):
     print(f"ECG文件夹中的文件总数：{len(os.listdir(ecg_dir))}")
     ecg_data = []
 
-    # 定义所有导联名称
+    # 定义所有导���名称
     LEADS = ['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
     # 定义特征名称
     FEATURE_NAMES = ['mean', 'std', 'max', 'min']
@@ -340,7 +340,7 @@ def process_ecg_data(ecg_dir):
     
     # 打印列名示例
     print("\nECG特征列名示例:")
-    for lead in LEADS[:2]:  # 只显示前两个导联的示例
+    for lead in LEADS[:2]:  # 只显示��两个导联的示例
         for signal_type in SIGNAL_TYPES:
             for feature in FEATURE_NAMES:
                 print(f"ECG_{lead}_{signal_type}_{feature}")
@@ -511,6 +511,26 @@ def main():
     print("\n全部数据处理完成！")
     print(f"最终处理后的训练数据保存在: {os.path.join(final_train_dir, 'train_merged.csv')}")
     print(f"最终处理后的测试数据保存在: {os.path.join(final_test_dir, 'test_merged.csv')}")
+
+    # 添加列名转换步骤
+    print("\n开始转换列名格式...")
+    
+    # 处理训练集列名
+    train_path = os.path.join(final_train_dir, 'train_merged.csv')
+    train_data = pd.read_csv(train_path)
+    train_data.columns = [col.replace('.', '_') for col in train_data.columns]
+    train_data.to_csv(train_path, index=False)
+    print(f"训练集列名转换完成，示例：{list(train_data.columns)[:5]}")
+    
+    # 处理测试集列名
+    test_path = os.path.join(final_test_dir, 'test_merged.csv')
+    test_data = pd.read_csv(test_path)
+    test_data.columns = [col.replace('.', '_') for col in test_data.columns]
+    test_data.to_csv(test_path, index=False)
+    print(f"测试集列名转换完成，示例：{list(test_data.columns)[:5]}")
+    
+    print(f"\n最终处理后的训练数据保存在: {train_path}")
+    print(f"最终处理后的测试数据保存在: {test_path}")
 
 if __name__ == '__main__':
     start_time = time.time()

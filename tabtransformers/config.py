@@ -85,6 +85,9 @@ def get_loss_function(config: Dict[str, Any]):
         return nn.TripletMarginLoss(**loss_kwargs)
     elif loss_function_name == "triplet_margin_with_distance":
         return nn.TripletMarginWithDistanceLoss(**loss_kwargs)
+    elif loss_function_name == "WeightedBCEWithLogitsLoss":
+        from .loss_functions import WeightedBCEWithLogitsLoss
+        return WeightedBCEWithLogitsLoss(**loss_kwargs)
     else:
         raise ValueError("loss_function must be supported by PyTorch")
 
